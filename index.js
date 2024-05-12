@@ -45,9 +45,10 @@ async function run() {
         res.send(result)
     })
 
-    app.post('/Book_Appointment', async (req,res)=>{
-        const doc = req.body; 
-        const result = await appointmentBookingCollection.insertOne(doc);
+    app.post('/Manage_Appointment/:email', async (req,res)=>{
+        const email = req.params.email;
+        const query = {doctorEmail:email} 
+        const result = await allServiceCollection.find(query).toArray();
         res.send(result)
     })
     
