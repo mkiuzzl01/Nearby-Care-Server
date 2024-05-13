@@ -25,6 +25,7 @@ async function run() {
     await client.connect();
     const allServiceCollection = client.db('Nearby_Care').collection('All_Services') ;
     const appointmentBookingCollection = client.db('Nearby_Care').collection('Appointment_Booking');
+    const Contact_Us_Collection = client.db('Nearby_Care').collection('Contact_Us_Collection');
 
     app.get('/Popular_Services', async(req,res)=>{
         const result = await allServiceCollection.find().toArray();
@@ -68,6 +69,11 @@ async function run() {
     app.post('/Book_Appointment', async (req,res)=>{
         const doc = req.body
         const result = await appointmentBookingCollection.insertOne(doc);
+        res.send(result)
+    })
+    app.post('/Contact_us', async (req,res)=>{
+        const doc = req.body
+        const result = await Contact_Us_Collection.insertOne(doc);
         res.send(result)
     })
 
