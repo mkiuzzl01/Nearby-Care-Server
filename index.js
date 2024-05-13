@@ -51,12 +51,33 @@ async function run() {
         const result = await allServiceCollection.find(query).toArray();
         res.send(result)
     })
-    app.delete('/Manage_Appointment/:id', async (req,res)=>{
+    app.delete('/Delete_Appointment/:id', async (req,res)=>{
         const id = req.params.id;
         const query = {_id:new ObjectId(id)} 
         const result = await allServiceCollection.deleteOne(query);
         res.send(result)
     })
+
+    app.put('/Update_Appointment/:id', async (req,res)=>{
+        const id = req.params.id;
+        const updated = req.body;
+        const query = {_id:new ObjectId(id)} 
+        const options = {upsert:true};
+        const appointment = {
+            $set:{
+                doctorName:updated.doctorName,
+                doctorEmail:updated.doctorEmail,
+                expertise:updated.expertise,
+                location:updated.location,
+                photo:updated.photo,
+                consultation_cost:updated.consultation_cost,
+                description:updated.description,
+            },
+        }
+        const result = await allServiceCollection.updateOne(query,appointment,options);
+        res.send(result)
+    })
+
     
 
     await client.db("admin").command({ ping: 1 });
