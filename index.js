@@ -38,6 +38,26 @@ async function run() {
         res.send(result)
         
     })
+
+    app.get('/Manage_Appointment/:email', async (req,res)=>{
+        const email = req.params.email;
+        const query = {doctorEmail:email} 
+        const result = await allServiceCollection.find(query).toArray();
+        res.send(result)
+    })
+    app.get('/Booked_Appointment/:email', async (req,res)=>{
+        const email = req.params.email;
+        const query = {'user.user_Email':email} 
+        const result = await appointmentBookingCollection.find(query).toArray();
+        res.send(result)
+    })
+    app.get('/Service_To_Do/:email', async (req,res)=>{
+        const email = req.params.email;
+        const query = {doctor_Email:email} 
+        const result = await appointmentBookingCollection.find(query).toArray();
+        res.send(result)
+    })
+
     
     app.post('/Add_Appointment', async (req,res)=>{
         const doc = req.body; 
@@ -45,12 +65,12 @@ async function run() {
         res.send(result)
     })
 
-    app.post('/Manage_Appointment/:email', async (req,res)=>{
-        const email = req.params.email;
-        const query = {doctorEmail:email} 
-        const result = await allServiceCollection.find(query).toArray();
+    app.post('/Book_Appointment', async (req,res)=>{
+        const doc = req.body
+        const result = await appointmentBookingCollection.insertOne(doc);
         res.send(result)
     })
+
     app.delete('/Delete_Appointment/:id', async (req,res)=>{
         const id = req.params.id;
         const query = {_id:new ObjectId(id)} 
@@ -58,7 +78,7 @@ async function run() {
         res.send(result)
     })
 
-    app.put('/Update_Appointment/:id', async (req,res)=>{
+    app.put("/Update_Appointment/:id", async (req,res)=>{
         const id = req.params.id;
         const updated = req.body;
         const query = {_id:new ObjectId(id)} 
@@ -78,6 +98,18 @@ async function run() {
         res.send(result)
     })
 
+    app.patch("/Status/:id",async(req,res)=>{
+      const id = req.params.id;
+      const doc = req.body;
+      const query = {_id: new ObjectId(id)};
+      const update = {
+        $set:{
+          'user.status':doc.Status,
+        }
+      }
+      const result = await appointmentBookingCollection.updateOne(query,update);
+      res.send(result);
+    })
     
 
     await client.db("admin").command({ ping: 1 });
