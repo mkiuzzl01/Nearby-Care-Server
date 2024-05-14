@@ -1,41 +1,37 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-// const jwt = require("jsonwebtoken");
-// const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware
-// app.use(cors({
-//   origin: [
-//     // 'http://localhost:5000//Services',
-//     'http://localhost:5173/'
-//   ],
-//   credentials: true,
-//   optionsSuccessStatus:200,
-// }));
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173'],
+  credentials: true,
+  optionsSuccessStatus:200,
+}));
 app.use(express.json());
-// app.use(cookieParser());
+app.use(cookieParser());
 
-// const tokenVerify = async (req,res,next)=>{
-//   const token = req.cookies?.token;
-//   console.log('value of token in middleware', token);
-//   if(!token){
-//     return res.status(401).send({message:'Unauthorize'})
-//   }
-//   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err,decoded)=>{
-//     if(err){
-//       console.log(err);
-//       return res.status(401).send({message:'Unauthorize'})
-//     }
-//     console.log('value in the token',decoded)
-//     req.user = decoded;
-//     next()
-//   })
-// }
+const tokenVerify = async (req,res,next)=>{
+  const token = req.cookies?.token;
+  console.log('value of token in middleware', token);
+  if(!token){
+    return res.status(401).send({message:'Unauthorize'})
+  }
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err,decoded)=>{
+    if(err){
+      console.log(err);
+      return res.status(401).send({message:'Unauthorize'})
+    }
+    console.log('value in the token',decoded)
+    req.user = decoded;
+    next()
+  })
+}
 
 const uri = `mongodb+srv://${process.env.VITE_DB_NAME}:${process.env.VITE_DB_PASS}@cluster0.rbychrh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -68,31 +64,43 @@ async function run() {
 
     app.get("/Search", async (req, res) => {
       const search = req.query.search;
-      let query = {expertise:{$regex:search,$options:"i" } };
+      let query = {};
+      if(search){
+        query = {expertise:{$regex:search,$options:"i" } };
+      }
       const result = await allServiceCollection.find(query).toArray();
       res.send(result);
     });
 
-    app.get("/View_Details/:id", async (req, res) => {
+    app.get("/View_Details/:id",async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await allServiceCollection.findOne(query);
       res.send(result);
     });
 
-    app.get("/Manage_Appointment/:email", async (req, res) => {
+    app.get("/Manage_Appointment/:email", tokenVerify, async (req, res) => {
+      if(req.user.email !== req.params.email){
+        return res.status(403).send({message:'forbidden access'})
+      }
       const email = req.params.email;
       const query = { doctorEmail: email };
       const result = await allServiceCollection.find(query).toArray();
       res.send(result);
     });
-    app.get("/Booked_Appointment/:email", async (req, res) => {
+    app.get("/Booked_Appointment/:email", tokenVerify, async (req, res) => {
+      if(req.user.email !== req.params.email){
+        return res.status(403).send({message:'forbidden access'})
+      }
       const email = req.params.email;
       const query = { "user.user_Email": email };
       const result = await appointmentBookingCollection.find(query).toArray();
       res.send(result);
     });
-    app.get("/Service_To_Do/:email", async (req, res) => {
+    app.get("/Service_To_Do/:email", tokenVerify, async (req, res) => {
+      if(req.user.email !== req.params.email){
+        return res.status(403).send({message:'forbidden access'})
+      }
       const email = req.params.email;
       const query = { doctor_Email: email };
       const result = await appointmentBookingCollection.find(query).toArray();
@@ -164,18 +172,26 @@ async function run() {
     });
 
     // userAuthenticate
-    //  app.post('/jwt', async (req,res) => {
-    //   const user = req.body;
-    //   console.log(user);
-    //   const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '1h' });
-    //   res
-    //   .cookie('token', token, {
-    //     httpOnly: true,
-    //     secure: process.env.NODE_ENV === 'production',
-    //     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-    //   })
-    //   .send({ success: true })
-    // });
+     app.post("/jwt", async (req,res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '1h' });
+      res.
+      cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      })
+      .send({ success: true })
+    });
+
+    app.post('/Logout', async(req,res)=>{
+      res.clearCookie('token', {
+        maxAge: 0,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      })
+      .send({ success: true })
+    })
 
     await client.db("admin").command({ ping: 1 });
     console.log(
