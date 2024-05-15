@@ -62,13 +62,25 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/Search", async (req, res) => {
+    app.get("/Services_count", async (req, res) => {
       const search = req.query.search;
       let query = {};
       if(search){
         query = {expertise:{$regex:search,$options:"i" } };
       }
-      const result = await allServiceCollection.find(query).toArray();
+      const numbers = await allServiceCollection.countDocuments(query);
+      res.send({numbers});
+    });
+
+    app.get("/All_Services", async (req, res) => {
+      const size = parseInt(req.query.size);
+      const page = parseInt(req.query.page) - 1;
+      const search = req.query.search;
+      let query = {};
+      if(search){
+        query = {expertise:{$regex:search,$options:"i" } };
+      }
+      const result = await allServiceCollection.find(query).skip(page*size).limit(size).toArray();
       res.send(result);
     });
 
