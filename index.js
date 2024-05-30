@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.PAYMENT_SECRET);
 // const jwt = require("jsonwebtoken");
 // const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -10,7 +11,6 @@ const port = process.env.PORT || 5000;
 // middleware
 app.use(cors());
 app.use(express.json());
-
 
 //============ this comment because in the Assignment notified me but after get mark then uncomment  ===============
 // app.use(cookieParser());
@@ -44,7 +44,8 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
+
     const allServiceCollection = client
       .db("Nearby_Care")
       .collection("All_Services");
@@ -63,11 +64,11 @@ async function run() {
     app.get("/Services_count", async (req, res) => {
       const search = req.query.search;
       let query = {};
-      if(search){
-        query = {expertise:{$regex:search,$options:"i" } };
+      if (search) {
+        query = { expertise: { $regex: search, $options: "i" } };
       }
       const numbers = await allServiceCollection.countDocuments(query);
-      res.send({numbers});
+      res.send({ numbers });
     });
 
     app.get("/All_Services", async (req, res) => {
@@ -75,14 +76,18 @@ async function run() {
       const page = parseInt(req.query.page) - 1;
       const search = req.query.search;
       let query = {};
-      if(search){
-        query = {expertise:{$regex:search,$options:"i" } };
+      if (search) {
+        query = { expertise: { $regex: search, $options: "i" } };
       }
-      const result = await allServiceCollection.find(query).skip(page*size).limit(size).toArray();
+      const result = await allServiceCollection
+        .find(query)
+        .skip(page * size)
+        .limit(size)
+        .toArray();
       res.send(result);
     });
 
-    app.get("/View_Details/:id",async (req, res) => {
+    app.get("/View_Details/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await allServiceCollection.findOne(query);
@@ -181,6 +186,46 @@ async function run() {
       res.send(result);
     });
 
+    //Payment Related API
+    app.get("/Payment/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await appointmentBookingCollection.findOne(query);
+      res.send(result);
+    });
+
+    //payment Intent
+    app.post("/payment-intent", async (req, res) => {
+      const { cost } = req.body;
+      const amount = parseInt(cost * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    //after payment update
+    app.patch("/payment-update/:id", async (req, res) => {
+      const id = req.params.id;
+      const info = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          "user.transaction": info.transaction,
+          "user.paymentDate": info.paymentDate,
+        },
+      };
+      const result = await appointmentBookingCollection.updateOne(
+        filter,
+        updateDoc
+      );
+      res.send(result);
+    });
+
     //============ this comment because in the Assignment notified me but after get mark then uncomment  ===============
     // userAuthenticate
     //  app.post("/jwt", async (req,res) => {
@@ -204,10 +249,10 @@ async function run() {
     //   .send({ success: true })
     // })
 
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
