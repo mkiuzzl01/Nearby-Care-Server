@@ -2,38 +2,43 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.PAYMENT_SECRET);
-// const jwt = require("jsonwebtoken");
-// const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173","https://nearby-care.web.app/"],
+    credentials: true,
+  })
+);
 app.use(express.json());
+app.use(cookieParser());
 
-//============ this comment because in the Assignment notified me but after get mark then uncomment  ===============
-// app.use(cookieParser());
-// const tokenVerify = async (req,res,next)=>{
-//   const token = req.cookies?.token;
-//   console.log('value of token in middleware', token);
-//   if(!token){
-//     return res.status(401).send({message:'Unauthorize'})
-//   }
-//   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err,decoded)=>{
-//     if(err){
-//       console.log(err);
-//       return res.status(401).send({message:'Unauthorize'})
-//     }
-//     console.log('value in the token',decoded)
-//     req.user = decoded;
-//     next()
-//   })
-// }
+//===========token verification=================
+const tokenVerify = async (req, res, next) => {
+  const token = req.cookies?.token;
+  // console.log("value of token in middleware", token);
+  if (!token) {
+    return res.status(401).send({ message: "Unauthorize" });
+  }
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      // console.log(err);
+      return res.status(401).send({ message: "Unauthorize" });
+    }
+    // console.log("value in the token", decoded);
+    req.user = decoded;
+    next();
+  });
+};
 
+//=============database connection==========================
 const uri = `mongodb+srv://${process.env.VITE_DB_NAME}:${process.env.VITE_DB_PASS}@cluster0.rbychrh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -56,6 +61,7 @@ async function run() {
       .db("Nearby_Care")
       .collection("Contact_Us_Collection");
 
+    //============get related route=========
     app.get("/Services", async (req, res) => {
       const result = await allServiceCollection.find().toArray();
       res.send(result);
@@ -94,19 +100,20 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/Manage_Appointment/:email", async (req, res) => {
-      // if(req.user.email !== req.params.email){
-      //   return res.status(403).send({message:'forbidden access'})
-      // }
+    app.get("/Manage_Appointment/:email", tokenVerify, async (req, res) => {
+
+      if (req.user.email !== req.params.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       const email = req.params.email;
       const query = { doctorEmail: email };
       const result = await allServiceCollection.find(query).toArray();
       res.send(result);
     });
-    app.get("/Booked_Appointment/:email", async (req, res) => {
-      // if(req.user.email !== req.params.email){
-      //   return res.status(403).send({message:'forbidden access'})
-      // }
+    app.get("/Booked_Appointment/:email", tokenVerify, async (req, res) => {
+      if (req.user.email !== req.params.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       const email = req.params.email;
       const query = { "user.user_Email": email };
       const result = await appointmentBookingCollection.find(query).toArray();
@@ -122,13 +129,14 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/Add_Appointment", async (req, res) => {
+    //=========post related route =======================
+    app.post("/Add_Appointment", tokenVerify, async (req, res) => {
       const doc = req.body;
       const result = await allServiceCollection.insertOne(doc);
       res.send(result);
     });
 
-    app.post("/Book_Appointment", async (req, res) => {
+    app.post("/Book_Appointment", tokenVerify, async (req, res) => {
       const doc = req.body;
       const result = await appointmentBookingCollection.insertOne(doc);
       res.send(result);
@@ -139,14 +147,23 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/Delete_Appointment/:id", async (req, res) => {
+    //===================delete relate route ===================
+    app.delete("/Delete_Appointment/:id", tokenVerify, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await allServiceCollection.deleteOne(query);
       res.send(result);
     });
 
-    app.put("/Update_Appointment/:id", async (req, res) => {
+    app.delete("/Delete_Booked_Appointment/:id", tokenVerify, async (req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await appointmentBookingCollection.deleteOne(query);
+      res.send(result);
+    })
+
+    //===========Update Related Route ========================
+    app.put("/Update_Appointment/:id", tokenVerify, async (req, res) => {
       const id = req.params.id;
       const updated = req.body;
       const query = { _id: new ObjectId(id) };
@@ -157,7 +174,7 @@ async function run() {
           doctorEmail: updated.doctorEmail,
           expertise: updated.expertise,
           location: updated.location,
-          photo: updated.photo,
+          image: updated.image,
           consultation_cost: updated.consultation_cost,
           description: updated.description,
         },
@@ -170,7 +187,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/Status/:id", async (req, res) => {
+    app.patch("/Status/:id", tokenVerify, async (req, res) => {
       const id = req.params.id;
       const doc = req.body;
       const query = { _id: new ObjectId(id) };
@@ -186,7 +203,7 @@ async function run() {
       res.send(result);
     });
 
-    //Payment Related API
+    //==============Payment Related API===============
     app.get("/Payment/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -194,8 +211,8 @@ async function run() {
       res.send(result);
     });
 
-    //payment Intent
-    app.post("/payment-intent", async (req, res) => {
+    //=============payment Intent========================
+    app.post("/payment-intent", tokenVerify, async (req, res) => {
       const { cost } = req.body;
       const amount = parseInt(cost * 100);
       const paymentIntent = await stripe.paymentIntents.create({
@@ -208,8 +225,8 @@ async function run() {
       });
     });
 
-    //after payment update
-    app.patch("/payment-update/:id", async (req, res) => {
+    //=============after payment update====================
+    app.patch("/payment-update/:id", tokenVerify, async (req, res) => {
       const id = req.params.id;
       const info = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -226,28 +243,31 @@ async function run() {
       res.send(result);
     });
 
-    //============ this comment because in the Assignment notified me but after get mark then uncomment  ===============
     // userAuthenticate
-    //  app.post("/jwt", async (req,res) => {
-    //   const user = req.body;
-    //   const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '1h' });
-    //   res.
-    //   cookie('token', token, {
-    //     httpOnly: true,
-    //     secure: process.env.NODE_ENV === 'production',
-    //     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-    //   })
-    //   .send({ success: true })
-    // });
 
-    // app.post('/Logout', async(req,res)=>{
-    //   res.clearCookie('token', {
-    //     maxAge: 0,
-    //     secure: process.env.NODE_ENV === 'production',
-    //     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-    //   })
-    //   .send({ success: true })
-    // })
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
+
+    app.post("/Logout", async (req, res) => {
+      res
+        .clearCookie("token", {
+          maxAge: 0,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
 
     // await client.db("admin").command({ ping: 1 });
     // console.log(
