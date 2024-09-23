@@ -11,7 +11,7 @@ const port = process.env.PORT || 5000;
 // middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173","https://nearby-care.web.app/"],
+    origin:["https://nearby-care.web.app","http://localhost:5173"],
     credentials: true,
   })
 );
@@ -101,7 +101,6 @@ async function run() {
     });
 
     app.get("/Manage_Appointment/:email", tokenVerify, async (req, res) => {
-
       if (req.user.email !== req.params.email) {
         return res.status(403).send({ message: "forbidden access" });
       }
@@ -119,10 +118,10 @@ async function run() {
       const result = await appointmentBookingCollection.find(query).toArray();
       res.send(result);
     });
-    app.get("/Service_To_Do/:email", async (req, res) => {
-      // if(req.user.email !== req.params.email){
-      //   return res.status(403).send({message:'forbidden access'})
-      // }
+    app.get("/Patients_Booked/:email", tokenVerify, async (req, res) => {
+      if (req.user.email !== req.params.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       const email = req.params.email;
       const query = { doctor_Email: email };
       const result = await appointmentBookingCollection.find(query).toArray();
@@ -155,12 +154,16 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/Delete_Booked_Appointment/:id", tokenVerify, async (req,res)=>{
-      const id = req.params.id;
-      const query = {_id: new ObjectId(id)};
-      const result = await appointmentBookingCollection.deleteOne(query);
-      res.send(result);
-    })
+    app.delete(
+      "/Delete_Booked_Appointment/:id",
+      tokenVerify,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await appointmentBookingCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
 
     //===========Update Related Route ========================
     app.put("/Update_Appointment/:id", tokenVerify, async (req, res) => {
@@ -250,6 +253,7 @@ async function run() {
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "1h",
       });
+    
       res
         .cookie("token", token, {
           httpOnly: true,
@@ -258,6 +262,7 @@ async function run() {
         })
         .send({ success: true });
     });
+    
 
     app.post("/Logout", async (req, res) => {
       res
